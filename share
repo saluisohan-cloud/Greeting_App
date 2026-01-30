@@ -1,0 +1,53 @@
+import streamlit as st
+import yfinance as yf
+import plotly.graph_objects as go
+from datetime import datetime
+
+st.set_page_config(page_title="NSE/BSE Live Tracker", layout="wide")
+
+# Custom CSS to make it look "Pro"
+st.markdown("""
+    <style>
+    .main { background-color: #0e1117; }
+    .stMetric { background-color: #161b22; border-radius: 10px; padding: 15px; }
+    </style>
+    """, unsafe_allow_stdio=True)
+
+@st.fragment(run_every=60)
+def render_market_header():
+    # Fetching the major Indian Indices
+    indices = {"Nifty 50": "^NSEI", "Sensex": "^BSESN"}
+    cols = st.columns(len(indices))
+    
+    for i, (name, ticker) in enumerate(indices.items()):
+        data = yf.download(ticker, period="2d", interval="1m")
+        if not data.empty:
+            curr = data['Close'].iloc[-1]
+            prev = data['Close'].iloc[0]
+            diff = curr - prev
+            cols[i].metric(name, f"₹{curr:,.2f}", f"{diff:+.2f} ({ (diff/prev)*100:+.2f}%)")
+
+render_market_header()
+
+# User Input for Specific Stock
+st.divider()
+ticker_input = st.text_input("Enter NSE Ticker (e.g., RELIANCE, TCS, INFYS)", value="RELIANCE")
+full_ticker = f"{ticker_input.upper()}.NS"
+
+@st.fragment(run_every=60)
+def stock_display(symbol):
+    df = yf.download(symbol, period="1d", interval="1m")
+    if df.empty:
+        st.error("Ticker not found. Remember to use NSE symbols.")
+        return
+
+    # Charting
+    fig = go.Figure(data=[go.Candlestick(
+        x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close']
+    )])
+    fig.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=450)
+    
+    st.subheader(f"Live Intraday: {symbol}")
+    st.plotly_chart(fig, use_container_width=True)
+
+stock_display(full_ticker)
